@@ -695,3 +695,77 @@ def plt_group_slipstats(df,groupby_cols,xname,**kwargs):
 
         for j in range(len(subplot_list), len(axes)):
             fig.delaxes(axes[j])
+
+def plt_stats_bar_v2(df,div,subtitle,bar,**kwargs):
+
+    # xcol = kwargs.get('x', np.nan)
+    st = kwargs.get('st', np.nan)
+    num = kwargs.get('num', np.nan)
+    numunit = kwargs.get('numunit','°C')
+    """
+    div_group = y축의 기준 축
+    subtitle_group = subplot 기준 그래프
+    bar_group = bar 그래프 비교 그래프
+    """
+    div_group = div
+    subtitle_group = subtitle
+    bar_group = bar
+
+    spec_list = sorted(df[div_group].unique())
+    grouped = df.groupby(subtitle_group) # {road: df_part}
+
+    palette = matplotlib.colormaps["Set1"]  # 최대 20색
+    color_cycle = itertools.cycle(palette.colors)
+    marker_cycle = itertools.cycle(["o", "s", "^", "D", "v", "P", "X", "*"])
+
+    color_map = {spec: next(color_cycle) for spec in spec_list}
+    marker_map = {spec: next(marker_cycle) for spec in spec_list}
+    padding = 0.02 # 막대 사이 여유 간격
+
+    for grp_name, df_grp in grouped:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        y_pos = np.arange(0, len(df_grp[div_group].unique())*2, 2)
+        y_labels = [row[div_group] for _, row in df_grp.iterrows()]
+
+        for i, (spec_val, df_spec) in enumerate(df_grp.groupby(div_group)):
+            df_spec = df_spec.sort_values(by='Datetime')
+            df_plot = df_spec.drop_duplicates(subset=bar_group, keep='first')
+
+            n_bars = len(df_plot)
+            offset = (1.0 - padding * (n_bars - 1)) / n_bars
+
+            for j, (_, row) in enumerate(df_plot.iterrows()):
+                y_centered = y_pos[i] - 0.5 + (offset + padding) * j + offset / 2
+                color = palette(j % palette.N)
+
+                upper_col = [col for col in df_plot.columns if 'supper' in str(col)][0]
+                lower_col = [col for col in df_plot.columns if 'slower' in str(col)][0]
+                mean_col = [col for col in df_plot.columns if 'smean' in str(col)][0]
+
+                ax.barh(y=y_centered,
+                        width=row[upper_col] - row[lower_col],
+                        left=row[lower_col],height=offset,
+                        color=color_map[spec_val],alpha=0.5)
+
+                ax.plot(row[mean_col],y_centered,
+                        marker=marker_map[spec_val],
+                        color=color,
+                        markersize=4)
+
+                text_parts = [str(row[div_group])]
+                if pd.isna(st) == False:
+                    text_parts.append(str(row[st]))
+                if pd.isna(num) == False:
+                    text_parts.append(f"{row[num]:.1f} {numunit}")
+                text_parts.append(f"{round(row[mean_col], 1)} m")
+
+                ax.text(row[upper_col] + 0.02,y_centered,"-".join(text_parts),
+                        va='center', fontsize=8)
+
+        ax.set_yticks(y_pos)
+        ax.set_xlabel("Braking Distance")
+        ax.set_title(grp_name)
+        ax.grid(True, linestyle="--", alpha=0.4)
+
+    plt.tight_layout()
+    return
