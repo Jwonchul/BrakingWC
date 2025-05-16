@@ -17,6 +17,7 @@ import numpy as np
 from scipy import stats
 import seaborn as sns
 from Func_stats import *
+from scipy.stats import mannwhitneyu
 
 def ReadDataPickle(FileName=None, **kwargs) :
     """
@@ -208,6 +209,17 @@ def ReadData(FileName=None, **kwargs) :
 
             elif ext == '.csv':
                 data = pd.read_csv(file)
+            elif ext == '.mat':
+                file_select_name = os.path.basename(file.name)
+                parts = re.split(r"[-_]", file_select_name)
+                # parts = file_select_name.split("-")
+                if parts[0]=='hyc':
+                    data = read_hylat_mat(file)
+                elif parts[0]=='hys':
+                    data = read_hylong_mat(file)
+                    read_hylong_mat
+                else:
+                    print(f"Test Mode 추가 필요: {ext}")
             else:
                 print(f"지원되지 않는 파일 형식: {ext}")
                 data = None
@@ -408,7 +420,7 @@ def plt_group_multi(df,groupby_cols,xcol,ycol,**kwargs):
             ax.set_xlabel(xcol)
             ax.set_xlim([df[xcol].min()-df[xcol].std(),df[xcol].max()+df[xcol].std()])
             ax.set_ylabel(ycol)
-            ax.set_ylim([df[ycol].min()-df[xcol].std(), df[ycol].max()+df[xcol].std()])
+            ax.set_ylim([df[ycol].min()-df[ycol].std(), df[ycol].max()+df[ycol].std()])
             ax.grid(True, linestyle="--", alpha=0.4)
             ax.legend(loc='center left',bbox_to_anchor=(1.05, 0.5),fontsize=8)
 
@@ -447,7 +459,10 @@ def plt_change_v2(df,div_group,group,**kwargs):
 
             cols = [f"Dist_{i}" for i in range(numdist)]
             df_stat = df_numeric[cols]
-            f_stat, p_value = stats.f_oneway(*df_stat.values)
+            # f_stat, p_value = stats.f_oneway(*df_stat.values)
+            group1 = df_stat.iloc[:, 0].dropna()
+            group2 = df_stat.iloc[:, 1].dropna()
+            f_stat, p_value = mannwhitneyu(group1, group2, alternative='two-sided')
 
             n1 = n2 = 4
             mean1 = df_numeric.iloc[1]['Dist_mean']
@@ -769,3 +784,111 @@ def plt_stats_bar_v2(df,div,subtitle,bar,**kwargs):
 
     plt.tight_layout()
     return
+def read_hylat_mat(path):
+    from scipy.io import loadmat
+    from scipy.integrate import simpson
+    def near_index(array, value):  # 목표 수치에 가장 가까운 값의 Index 반환
+        abs_array = np.abs(array)
+        diff = np.abs(abs_array - value)
+        index = np.argmin(diff)
+        return index
+
+    mat = loadmat(path)
+    header = mat['__header__']
+    header_str = header.decode()
+    date = header_str.split("Created on: ")[-1]
+    data = mat['fitResult']
+
+    MaxG = data[3][0][0][0][0][0][0]
+    MaxSpeed = data[3][0][0][0][1][0][0]
+    HalfSpeed = data[3][0][0][0][2][0][0]
+    Area = data[3][0][0][0][3][0][0]
+    Area_to_max = data[3][0][0][0][4][0][0]
+
+    mat_dot = data[0]
+    mat_ideal = data[1]
+    mat_fit = data[2]
+
+    dot_df = np.vstack(mat_dot).astype(np.float64)
+    dot_df = pd.DataFrame(dot_df.T)
+    dot_df.columns = ['Vel', 'Latacc']
+
+    y_pred = mat_fit[1].astype(float)
+    vel_created = mat_fit[0].astype(float)
+    # Max lateral acceleration
+    latacc_max_index = np.argmax(y_pred)
+    latacc_max = np.max(y_pred)
+    latacc_40 = latacc_max * 0.4
+    latacc_40_idx = near_index(y_pred, latacc_40)
+    # Max speed at max lateral acceleration
+    vel_max = vel_created[latacc_max_index][0]
+    # Speed at half of max lateral acceleration
+    vel_half_index = np.argmin(np.abs(y_pred - latacc_max / 2))
+    vel_half = vel_created[vel_half_index][0]
+    # Area between 40% of MaxG
+    area = simpson(y=y_pred[:latacc_40_idx].flatten(), x=vel_created[:latacc_40_idx].flatten())
+
+    vel_latacc_df = pd.DataFrame({
+        "Velocity": vel_created.flatten(),
+        'LatAcc': y_pred.flatten()
+    })
+
+    result = {
+        "MaxG": latacc_max,
+        "V1": vel_max,
+        "V2": vel_half,
+        "Area": area,
+        "Vel_Latacc_df": vel_latacc_df,
+        "Dot_df": dot_df
+    }
+
+    return result
+
+def read_hylong_mat(path):
+    from scipy.io import loadmat
+    def near_index(array, value):  # 목표 수치에 가장 가까운 값의 Index 반환
+        abs_array = np.abs(array)
+        diff = np.abs(abs_array - value)
+        index = np.argmin(diff)
+        return index
+
+    mat = loadmat(path)
+    header = mat['__header__']
+    header_str = header.decode()
+    date = header_str.split("Created on: ")[-1]
+    data = mat['dataList']
+    test_item = data[0][0][0][0][0]
+
+    vel_15 = data[7][0][0][0]
+    dist_15 = data[8][0][0][0]
+
+    vel = data[9][0][:, 0]
+    slip = data[9][0][:, 1]
+
+    idx_5 = near_index(slip, 5)
+    idx_10 = near_index(slip, 10)
+    idx_15 = near_index(slip, 15)
+    idx_20 = near_index(slip, 20)
+
+    vel_slip_df = pd.DataFrame({
+        'VelHorizontal': vel.flatten(),
+        'distSum': dist_15,
+        'SlipRatio': slip.flatten()
+    })
+
+    idx_4 = near_index(vel_slip_df['SlipRatio'], 3.5)
+
+    vel_slip_df = (vel_slip_df.iloc[idx_4:])
+    vel_slip_df.reset_index(drop=True, inplace=True)
+
+    result = {
+        'Velocity15%': vel_15,
+        'Distance15%': dist_15,
+        'Slip5%': vel[idx_5],
+        'Slip10%': vel[idx_10],
+        'Slip15%': vel[idx_15],
+        'Slip20%': vel[idx_20],
+        "Vel_Slip_df": vel_slip_df
+    }
+
+    return result

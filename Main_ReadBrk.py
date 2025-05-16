@@ -22,8 +22,8 @@ import scipy.stats as stats
 import itertools
 
 # path 지정
-# path = r'D:\VehicleTest\Data\2025\0. 기반기술\1. Compd 온도별 평가\WetBraking\Data'
-path = r'C:\Users\HANTA\Desktop\작업\1. Compd 온도별 평가\WetBraking'
+path = r'D:\VehicleTest\Data\2025\0. 기반기술\1. Compd 온도별 평가\WetBraking\Data'
+# path = r'C:\Users\HANTA\Desktop\작업\1. Compd 온도별 평가\WetBraking'
 
 # pickle(Performance 데이터), txt(Weather&Road 데이터) 모두 선택
 dfraw, fName = ReadData(path)
@@ -92,8 +92,8 @@ df_CV['CV'] = (df_CV['Dist_std']/df_CV['Dist_mean'])*100
 df_CV['CV_mean'] = df_CV['CV'].mean()*2
 
 # Data excel save
-# file_path = r'D:\VehicleTest\Data\2025\0. 기반기술\1. Compd 온도별 평가\WetBraking\Data\dfall.xlsx'
-# df_final.to_excel(file_path, index=False)
+file_path = r'D:\VehicleTest\Data\2025\0. 기반기술\1. Compd 온도별 평가\WetBraking\Data\dfall.xlsx'
+df_final.to_excel(file_path, index=False)
 
 # Road 구분
 spec_list = sorted(df_final['RoadInfo'].unique())

@@ -9,8 +9,8 @@ import pickle
 from Func_stats import *
 from scipy import stats
 
-# path = r'D:\VehicleTest\Data\2025\0. 기반기술\1. Compd 온도별 평가\WetBraking'
-path = r'C:\Users\HANTA\Desktop\작업\1. Compd 온도별 평가\WetBraking'
+path = r'D:\VehicleTest\Data\2025\0. 기반기술\1. Compd 온도별 평가\WetBraking'
+# path = r'C:\Users\HANTA\Desktop\작업\1. Compd 온도별 평가\WetBraking'
 
 # rawdf, fName = ReadDataFile(r'example_BRK_80-5_w4Slip.vbo', date=True)
 rawdf, fName = ReadDataFile(path, filter='*.vbo', date=True, headendline=300)
